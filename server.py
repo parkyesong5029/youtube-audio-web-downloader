@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import importlib.util
 import logging
 import os
 import shutil
@@ -153,13 +154,27 @@ def resolve_cookiefile() -> Optional[str]:
     return None
 
 
+def detect_js_runtimes() -> dict:
+    """Detects installed JS runtime (Deno preferred, Node fallback) for yt-dlp-ejs."""
+    runtimes: dict = {}
+    if shutil.which("deno"):
+        runtimes["deno"] = {}
+    if shutil.which("node"):
+        runtimes["node"] = {}
+    return runtimes
+
+
 def apply_ssl_compat_opts(opts: dict) -> dict:
-    """Applies system SSL truststore compatibility and optional user-configured YouTube cookies."""
+    """Applies system SSL truststore compatibility, JS runtime, and optional user-configured YouTube cookies."""
     if os.environ.get("SSL_CERT_FILE"):
         compat = list(opts.get("compat_opts", []))
         if "no-certifi" not in compat:
             compat.append("no-certifi")
         opts["compat_opts"] = compat
+
+    js_runtimes = detect_js_runtimes()
+    if js_runtimes:
+        opts["js_runtimes"] = js_runtimes
 
     cookiefile = resolve_cookiefile()
     if cookiefile:
@@ -264,13 +279,13 @@ def run_download_job(job: DownloadJob) -> None:
     mime_type = "audio/mp4" if fmt == "m4a" else "audio/mpeg"
 
     strategies = [
-        None,
-        {"youtube": {"player_client": ["android_vr", "android", "web"]}},
+        (None, "bestaudio/best"),
+        ({"youtube": {"player_client": ["web", "mweb", "tv"]}}, "bestaudio*/best"),
     ]
 
     last_err: Optional[Exception] = None
 
-    for idx, extractor_args in enumerate(strategies):
+    for idx, (extractor_args, format_selector) in enumerate(strategies):
         if job.cancel_event.is_set():
             job.status = "cancelled"
             job.status_text = "다운로드가 취소되었습니다."
@@ -283,7 +298,7 @@ def run_download_job(job: DownloadJob) -> None:
 
         job.status = "downloading"
         job.percent = 0
-        job.status_text = "유튜브 음원 정보를 분석하는 중..." if idx == 0 else "대체 경로로 음원 추출 재시도 중..."
+        job.status_text = "유튜브 음원 정보를 분석하는 중..." if idx == 0 else "대체 포맷으로 음원 추출 재시도 중..."
 
         def progress_hook(d: dict) -> None:
             if job.cancel_event.is_set():
@@ -315,7 +330,7 @@ def run_download_job(job: DownloadJob) -> None:
 
         ydl_opts = apply_ssl_compat_opts(
             {
-                "format": "bestaudio/best",
+                "format": format_selector,
                 "noplaylist": True,
                 "quiet": True,
                 "no_warnings": True,
@@ -392,6 +407,8 @@ async def health():
         "status": "ok",
         "ffmpeg": shutil.which("ffmpeg") is not None,
         "yt_dlp_version": yt_dlp.version.__version__,
+        "ejs_installed": importlib.util.find_spec("yt_dlp_ejs") is not None,
+        "js_runtimes": list(detect_js_runtimes().keys()),
         "cookies_configured": resolve_cookiefile() is not None,
     }
 
