@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>YouTube 음원 다운로더 — iPhone · 웹 버전</title>
+  <meta name="description" content="아이폰 Safari, 안드로이드, PC에서 유튜브 영상을 검색하고 미리 들어본 뒤 MP3 또는 M4A 음원으로 바로 저장하는 웹 앱" />
+
+  <!-- iOS Safari PWA Home Screen Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="YT 음원" />
+  <meta name="theme-color" content="#E11D38" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <a href="/" class="brand" id="brandHomeLink">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+          </svg>
+        </span>
+        <span class="brand-title">YouTube 음원</span>
+      </a>
+      <div class="header-actions">
+        <button type="button" class="icon-btn" id="btnOpenHistory" aria-label="최근 다운로드 기록">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <polyline points="12 7 12 12 15 15"></polyline>
+          </svg>
+          <span>기록</span>
+        </button>
+        <button type="button" class="icon-btn" id="btnToggleTheme" aria-label="화면 테마 전환">
+          <svg id="iconTheme" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <!-- Search & Link Input Section -->
+    <section class="search-section" aria-label="유튜브 검색 및 링크 입력">
+      <h1 class="page-title">듣고, 바로 음원 저장</h1>
+      <p class="page-subtitle">노래 제목을 검색하거나 유튜브 링크를 붙여넣어 아이폰 '파일' 앱이나 기기에 바로 저장하세요.</p>
+
+      <form id="searchForm" class="search-form" autocomplete="off">
+        <span class="search-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </span>
+        <input
+          id="searchInput"
+          class="search-input"
+          type="search"
+          enterkeyhint="search"
+          placeholder="곡명, 가수 검색 또는 유튜브 링크 붙여넣기"
+          aria-label="곡명 검색 또는 유튜브 링크 입력"
+        />
+        <button type="button" class="paste-btn" id="btnPaste">붙여넣기</button>
+        <button type="submit" class="search-submit-btn" id="btnSearchSubmit">검색</button>
+      </form>
+
+      <div class="quick-tags" aria-label="추천 검색어">
+        <button type="button" class="quick-tag" data-query="아이유 밤편지">아이유 밤편지</button>
+        <button type="button" class="quick-tag" data-query="잔잔한 카페 재즈 피아노">카페 재즈 피아노</button>
+        <button type="button" class="quick-tag" data-query="드라이브 팝송 플레이리스트">드라이브 팝송</button>
+        <button type="button" class="quick-tag" data-query="최신 발라드 인기곡">최신 발라드</button>
+      </div>
+    </section>
+
+    <!-- Active Video Preview & Download Stage -->
+    <section id="previewStage" class="preview-stage hidden" aria-label="선택된 영상 미리듣기 및 다운로드">
+      <div class="player-frame-wrap">
+        <iframe
+          id="ytPlayerFrame"
+          title="YouTube 영상 미리듣기"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+        ></iframe>
+      </div>
+      <div class="preview-body">
+        <div class="preview-meta">
+          <div>
+            <h2 id="previewTitle" class="preview-title"></h2>
+            <p id="previewChannel" class="preview-channel"></p>
+          </div>
+          <button type="button" id="btnClosePreview" class="close-preview-btn">닫기</button>
+        </div>
+
+        <div class="download-controls">
+          <div class="format-segment" role="radiogroup" aria-label="음원 형식 선택">
+            <button type="button" class="format-option active" data-format="mp3" data-quality="192">MP3 192k</button>
+            <button type="button" class="format-option" data-format="mp3" data-quality="320">MP3 320k</button>
+            <button type="button" class="format-option" data-format="m4a" data-quality="192">M4A (iOS)</button>
+          </div>
+          <button type="button" id="btnStartDownload" class="primary-download-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z" />
+            </svg>
+            <span id="btnStartDownloadLabel">MP3 음원 다운로드</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Search Results -->
+    <section aria-label="검색 결과">
+      <div class="section-header" id="resultsHeader" style="display: none;">
+        <h2 class="section-title" id="resultsHeading">검색 결과</h2>
+        <span class="section-count" id="resultsCount"></span>
+      </div>
+      <div id="resultsContainer" class="results-list">
+        <div class="empty-state">
+          <h2>유튜브 곡명을 검색하거나 링크를 붙여넣으세요</h2>
+          <p>영상을 눌러 바로 들어본 뒤 원하는 형식으로 음원을 저장할 수 있습니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Concise iPhone Safari & Files App Guide -->
+    <aside class="ios-guide" aria-label="아이폰 저장 안내">
+      <h2 class="ios-guide-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="2" width="12" height="20" rx="2.5"></rect>
+          <line x1="12" y1="18" x2="12.01" y2="18"></line>
+        </svg>
+        아이폰(iOS Safari) 저장 및 홈 화면 추가 팁
+      </h2>
+      <ol class="ios-steps">
+        <li><strong>파일 앱 저장:</strong> 변환 완료 후 <strong>파일 앱에 저장</strong>을 누르면 Safari에서 다운로드되어 아이폰 <strong>파일 앱 → 다운로드</strong> 폴더에 저장됩니다.</li>
+        <li><strong>USB 외장 메모리 복사:</strong> 아이폰에 USB-C / 라이트닝 USB를 꽂은 뒤, 완료 창에서 <strong>공유 시트 → 파일에 저장 → USB 드라이브</strong>를 선택하면 바로 복사됩니다.</li>
+        <li><strong>앱처럼 사용하기:</strong> Safari 하단 <strong>공유 버튼(□↑) → 홈 화면에 추가</strong>를 누르면 앱 아이콘으로 바로 실행할 수 있습니다.</li>
+      </ol>
+    </aside>
+  </main>
+
+  <!-- Progress Modal Sheet -->
+  <div id="progressModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="progressModalTitle">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h2 id="progressModalTitle" class="modal-title">음원 추출 중</h2>
+        <span id="progressPercent" class="percent-readout">0%</span>
+      </div>
+      <p id="progressTrackName" class="modal-track-name"></p>
+      <div class="progress-track">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <p id="progressStatusText" class="progress-status">다운로드 준비 중...</p>
+      <button type="button" id="btnCancelJob" class="btn-secondary">취소</button>
+    </div>
+  </div>
+
+  <!-- Download Complete Modal Sheet -->
+  <div id="completeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="completeHeading">
+    <div class="modal-sheet">
+      <div class="complete-badge" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2 id="completeHeading" class="complete-heading">음원 준비 완료</h2>
+      <p id="completeSub" class="complete-sub">아래 버튼을 눌러 아이폰 '파일' 앱이나 기기에 저장하세요.</p>
+
+      <div class="file-summary">
+        <p id="completeFileName" class="file-summary-name"></p>
+        <p id="completeFileMeta" class="file-summary-meta"></p>
+      </div>
+
+      <audio id="completeAudioPlayer" class="audio-preview" controls playsinline preload="metadata"></audio>
+
+      <div class="sheet-actions">
+        <a id="btnSaveFileLink" class="btn-save-primary" href="#" download>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z" />
+          </svg>
+          <span id="btnSaveFileText">기기 / 파일 앱에 저장</span>
+        </a>
+        <button type="button" id="btnNativeShare" class="btn-secondary">
+          iPhone 공유 시트 (파일 · USB로 보내기)
+        </button>
+        <button type="button" id="btnCloseComplete" class="btn-ghost">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal Sheet -->
+  <div id="historyModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="historyHeading">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h2 id="historyHeading" class="modal-title">최근 저장 기록</h2>
+        <button type="button" id="btnClearHistory" class="close-preview-btn">전체 삭제</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
+      <button type="button" id="btnCloseHistory" class="btn-secondary">닫기</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
