@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 import os
 import shutil
@@ -100,13 +101,70 @@ def cleanup_expired_jobs() -> None:
             shutil.rmtree(job_dir, ignore_errors=True)
 
 
+def resolve_cookiefile() -> Optional[str]:
+    """
+    Resolves an optional user-supplied Netscape cookies.txt file for authenticated YouTube requests.
+    Supports:
+      1. YT_COOKIES_FILE env var path
+      2. Render Secret File default path (/etc/secrets/cookies.txt)
+      3. YT_COOKIES_B64 or YT_COOKIES_TXT env var content
+    Always copies to a writable file under WORK_ROOT because Render Secret Files are read-only.
+    """
+    runtime_cookie_path = WORK_ROOT / "_runtime_cookies.txt"
+
+    # 1. File path via env var or Render Secret File
+    candidate_paths = []
+    env_file = os.environ.get("YT_COOKIES_FILE", "").strip()
+    if env_file:
+        candidate_paths.append(Path(env_file))
+    candidate_paths.append(Path("/etc/secrets/cookies.txt"))
+
+    for path in candidate_paths:
+        try:
+            if path.is_file() and path.stat().st_size > 0:
+                content = path.read_bytes()
+                runtime_cookie_path.write_bytes(content)
+                os.chmod(runtime_cookie_path, 0o600)
+                return str(runtime_cookie_path)
+        except Exception as exc:
+            logger.warning("Failed reading cookie file %s: %s", path, exc)
+
+    # 2. Inline base64 or plain Netscape cookie text via env var
+    b64_val = os.environ.get("YT_COOKIES_B64", "").strip()
+    if b64_val:
+        try:
+            decoded = base64.b64decode(b64_val)
+            if decoded.strip():
+                runtime_cookie_path.write_bytes(decoded)
+                os.chmod(runtime_cookie_path, 0o600)
+                return str(runtime_cookie_path)
+        except Exception as exc:
+            logger.warning("Failed decoding YT_COOKIES_B64: %s", exc)
+
+    raw_txt = os.environ.get("YT_COOKIES_TXT", "").strip()
+    if raw_txt:
+        try:
+            runtime_cookie_path.write_text(raw_txt + "\n", encoding="utf-8")
+            os.chmod(runtime_cookie_path, 0o600)
+            return str(runtime_cookie_path)
+        except Exception as exc:
+            logger.warning("Failed writing YT_COOKIES_TXT: %s", exc)
+
+    return None
+
+
 def apply_ssl_compat_opts(opts: dict) -> dict:
-    """When SSL_CERT_FILE is configured (e.g. corporate/container CA), use system truststore."""
+    """Applies system SSL truststore compatibility and optional user-configured YouTube cookies."""
     if os.environ.get("SSL_CERT_FILE"):
         compat = list(opts.get("compat_opts", []))
         if "no-certifi" not in compat:
             compat.append("no-certifi")
         opts["compat_opts"] = compat
+
+    cookiefile = resolve_cookiefile()
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
+
     return opts
 
 
@@ -313,7 +371,14 @@ def run_download_job(job: DownloadJob) -> None:
             last_err = exc
 
     job.status = "failed"
-    job.error = str(last_err or "음원 추출에 실패했습니다.")
+    raw_error = str(last_err or "음원 추출에 실패했습니다.")
+    if "Sign in to confirm" in raw_error or "not a bot" in raw_error:
+        job.error = (
+            "유튜브 로그인 인증이 필요합니다. Render의 Secret Files에 cookies.txt를 등록하거나 "
+            "만료된 쿠키를 새로 갱신해 주세요.\n\n상세 오류: " + raw_error
+        )
+    else:
+        job.error = raw_error
     job.status_text = "음원 추출 중 오류가 발생했습니다."
     shutil.rmtree(job_dir, ignore_errors=True)
 
@@ -327,6 +392,7 @@ async def health():
         "status": "ok",
         "ffmpeg": shutil.which("ffmpeg") is not None,
         "yt_dlp_version": yt_dlp.version.__version__,
+        "cookies_configured": resolve_cookiefile() is not None,
     }
 
 

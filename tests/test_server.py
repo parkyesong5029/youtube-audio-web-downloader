@@ -1,6 +1,9 @@
+import base64
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
-from server import app
+from server import app, resolve_cookiefile
 from youtube_utils import (
     build_content_disposition,
     extract_video_id,
@@ -43,14 +46,37 @@ def test_health_and_static_routes():
     body = res.json()
     assert body["status"] == "ok"
     assert body["ffmpeg"] is True
+    assert "cookies_configured" in body
 
     root = client.get("/")
     assert root.status_code == 200
     assert "YouTube 음원 다운로더" in root.text
+    assert 'id="errorModal"' in root.text
 
     manifest = client.get("/manifest.webmanifest")
     assert manifest.status_code == 200
     assert manifest.json()["display"] == "standalone"
+
+
+def test_resolve_cookiefile_from_file_and_env(tmp_path, monkeypatch):
+    monkeypatch.delenv("YT_COOKIES_FILE", raising=False)
+    monkeypatch.delenv("YT_COOKIES_B64", raising=False)
+    monkeypatch.delenv("YT_COOKIES_TXT", raising=False)
+
+    sample = "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tTEST\t123\n"
+    cookie_src = tmp_path / "cookies.txt"
+    cookie_src.write_text(sample, encoding="utf-8")
+
+    monkeypatch.setenv("YT_COOKIES_FILE", str(cookie_src))
+    resolved = resolve_cookiefile()
+    assert resolved is not None
+    assert Path(resolved).read_text(encoding="utf-8") == sample
+
+    monkeypatch.delenv("YT_COOKIES_FILE", raising=False)
+    monkeypatch.setenv("YT_COOKIES_B64", base64.b64encode(sample.encode("utf-8")).decode("ascii"))
+    resolved_b64 = resolve_cookiefile()
+    assert resolved_b64 is not None
+    assert "TEST\t123" in Path(resolved_b64).read_text(encoding="utf-8")
 
 
 def test_invalid_job_url_returns_400():

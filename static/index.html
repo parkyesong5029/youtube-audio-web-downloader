@@ -207,6 +207,23 @@
     </div>
   </div>
 
+  <!-- Error Modal Sheet -->
+  <div id="errorModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="errorHeading">
+    <div class="modal-sheet">
+      <div class="error-badge" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <h2 id="errorHeading" class="complete-heading">다운로드 실패</h2>
+      <p id="errorSummary" class="complete-sub">음원 추출 중 문제가 발생했습니다.</p>
+      <div id="errorDetailBox" class="error-message-box"></div>
+      <button type="button" id="btnCloseError" class="btn-secondary">확인</button>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="/static/app.js"></script>

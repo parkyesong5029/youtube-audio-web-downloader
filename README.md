@@ -8,16 +8,12 @@
 - **iPhone 공유 시트(Web Share API) 지원**: 완료 창에서 **iPhone 공유 시트** 버튼을 누르면 아이폰에 연결된 **USB-C / 라이트닝 USB 드라이브**나 iCloud Drive로 바로 복사할 수 있습니다.
 - **홈 화면에 추가 (PWA)**: Safari 하단 `공유 → 홈 화면에 추가`를 누르면 앱처럼 전체 화면 아이콘으로 실행됩니다.
 
-## 실행 및 아이폰 접속을 위한 배포 방법
+## Render 클라우드 배포 시 YouTube 인증 쿠키(`cookies.txt`) 설정
+클라우드(Render 등) 데이터센터 IP에서는 유튜브가 로그인 인증을 요구할 수 있습니다. 본인이 로그인한 쿠키를 Render에 등록하면 서버가 자동으로 불러옵니다.
 
-### 1. 클라우드 무료 배포 (아이폰에서 HTTPS로 바로 접속 — 권장)
-이 프로젝트에는 [`Dockerfile`](Dockerfile)과 [`render.yaml`](render.yaml)이 포함되어 있습니다.
-- **Render / Railway / Fly.io**에 이 폴더(또는 GitHub 저장소)를 연결하면 Docker 이미지(`Python 3.11 + FFmpeg + yt-dlp`)로 자동 배포되며, 발급된 `https://...` 주소를 아이폰 Safari에서 열어 바로 사용할 수 있습니다.
-
-### 2. 내 PC / Mac / NAS에서 직접 실행 (같은 Wi-Fi 아이폰 접속)
-```bash
-pip install -r requirements.txt
-# FFmpeg 설치 필요 (macOS: brew install ffmpeg / Windows: winget install Gyan.FFmpeg)
-uvicorn server:app --host 0.0.0.0 --port 8787
-```
-같은 Wi-Fi에 연결된 아이폰 Safari에서 `http://<PC의 내부 IP>:8787`로 접속해 사용할 수 있습니다.
+1. PC 크롬(시크릿 창 권장)에서 YouTube에 로그인(보조 구글 계정 권장)한 뒤 Netscape 형식 `cookies.txt`를 내보냅니다.
+2. Render 대시보드 → `youtube-audio-web-downloader` → **Environment** → **Secret Files** → **Add Secret File**:
+   - **Filename**: `cookies.txt` *(자동으로 `/etc/secrets/cookies.txt`에 마운트되어 서버가 즉시 인식합니다)*
+   - **Contents**: `cookies.txt` 내용 전체 붙여넣기 → **Save Changes**
+3. 배포 완료 후 `https://<내 앱 주소>/api/health` 를 열었을 때 `"cookies_configured": true` 가 표시되면 정상 적용 완료입니다.
+   - *(대안: 환경변수 `YT_COOKIES_TXT` 또는 `YT_COOKIES_B64`, `YT_COOKIES_FILE`도 지원합니다.)*

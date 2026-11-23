@@ -336,7 +336,7 @@
         if (job.status === "failed") {
           state.activeJobId = null;
           closeProgressModal();
-          showToast(`실패: ${job.error || "음원 추출 오류"}`);
+          openErrorModal(job.error || "음원 추출 중 오류가 발생했습니다.");
           return;
         }
 
@@ -351,12 +351,37 @@
       } catch (err) {
         state.activeJobId = null;
         closeProgressModal();
-        showToast(err.message || "서버와 연결이 끊어졌습니다.");
+        openErrorModal(err.message || "서버와 연결이 끊어졌습니다.");
       }
     };
 
     tick();
   }
+
+  const errorModal = document.getElementById("errorModal");
+  const errorSummary = document.getElementById("errorSummary");
+  const errorDetailBox = document.getElementById("errorDetailBox");
+  const btnCloseError = document.getElementById("btnCloseError");
+
+  function openErrorModal(message) {
+    const text = String(message || "알 수 없는 오류가 발생했습니다.");
+    if (text.includes("쿠키") || text.includes("Sign in") || text.includes("not a bot")) {
+      errorSummary.textContent = "Render 서버에 YouTube 로그인 쿠키(cookies.txt) 등록이 필요합니다.";
+    } else {
+      errorSummary.textContent = "음원 추출 중 문제가 발생했습니다.";
+    }
+    errorDetailBox.textContent = text;
+    errorModal.classList.remove("hidden");
+  }
+
+  function closeErrorModal() {
+    errorModal.classList.add("hidden");
+  }
+
+  btnCloseError.addEventListener("click", closeErrorModal);
+  errorModal.addEventListener("click", (e) => {
+    if (e.target === errorModal) closeErrorModal();
+  });
 
   function openProgressModal(title) {
     progressTrackName.textContent = title || "YouTube 음원";
